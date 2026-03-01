@@ -34,9 +34,6 @@ def cue_screenshot(
     _server.guardrails.increment_action()
     start = time.perf_counter()
 
-    # H5: apply action delay
-    time.sleep(_server.config.action_delay)
-
     # H3: error if only some region parameters are provided
     region_params = [region_x, region_y, region_width, region_height]
     region_names = ["region_x", "region_y", "region_width", "region_height"]
@@ -49,6 +46,14 @@ def cue_screenshot(
     if all(provided):
         region = (region_x, region_y, region_width, region_height)
 
+    params = {"region": region}
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_screenshot", params)
+
+    # H5: apply action delay
+    time.sleep(_server.config.action_delay)
+
     img = capture_screenshot(region=region)
     jpeg_bytes = image_to_jpeg_bytes(
         img,
@@ -57,12 +62,11 @@ def cue_screenshot(
     )
 
     duration = (time.perf_counter() - start) * 1000
-    _server.audit.log(
-        "cue_screenshot",
-        {"region": region, "size": img.size},
-        result=f"JPEG {len(jpeg_bytes)} bytes",
-        duration_ms=duration,
-    )
+    log_params = {"region": region, "size": img.size}
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_screenshot", log_params, result=f"JPEG {len(jpeg_bytes)} bytes", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_screenshot", log_params, result=f"JPEG {len(jpeg_bytes)} bytes", duration_ms=duration)
 
     return MCPImage(data=jpeg_bytes, format="jpeg")
 
@@ -74,9 +78,16 @@ def cue_screen_size() -> dict:
     Returns:
         Dictionary with 'width' and 'height' in pixels.
     """
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_screen_size")
+
     size = pyautogui.size()
     result = {"width": size.width, "height": size.height}
-    _server.audit.log("cue_screen_size", {}, result=str(result))
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_screen_size", {}, result=str(result), decision=decision)
+    else:
+        _server.audit.log("cue_screen_size", {}, result=str(result))
     return result
 
 
@@ -87,7 +98,14 @@ def cue_cursor_position() -> dict:
     Returns:
         Dictionary with 'x' and 'y' coordinates.
     """
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_cursor_position")
+
     pos = pyautogui.position()
     result = {"x": pos.x, "y": pos.y}
-    _server.audit.log("cue_cursor_position", {}, result=str(result))
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_cursor_position", {}, result=str(result), decision=decision)
+    else:
+        _server.audit.log("cue_cursor_position", {}, result=str(result))
     return result

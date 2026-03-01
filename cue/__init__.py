@@ -1,3 +1,3 @@
 """CUE — Computer Use Enforcer: safety middleware for AI computer use agents."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

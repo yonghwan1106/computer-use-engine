@@ -34,6 +34,11 @@ def cue_type(text: str) -> str:
     _server.guardrails.increment_action()
     start = time.perf_counter()
 
+    params = {"text_length": len(text)}
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_type", params)
+
     time.sleep(_server.config.action_delay)
 
     if _is_ascii(text):
@@ -62,12 +67,11 @@ def cue_type(text: str) -> str:
 
     duration = (time.perf_counter() - start) * 1000
     display = text if len(text) <= 50 else text[:50] + "..."
-    _server.audit.log(
-        "cue_type",
-        {"text_length": len(text), "method": method},
-        result=f"Typed: {display}",
-        duration_ms=duration,
-    )
+    log_params = {"text_length": len(text), "method": method}
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_type", log_params, result=f"Typed: {display}", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_type", log_params, result=f"Typed: {display}", duration_ms=duration)
     return f"Typed {len(text)} characters via {method}."
 
 
@@ -87,6 +91,15 @@ def cue_key(key: str) -> str:
         _server.guardrails.check_key_allowed(key)
     except PermissionError as e:
         return f"Error: {e}"
+
+    params = {"key": key}
+    decision = None
+    if _server.pipeline is not None:
+        try:
+            decision = _server.pipeline.pre_action("cue_key", params, key_combo=key)
+        except PermissionError as e:
+            return f"Error: {e}"
+
     start = time.perf_counter()
 
     time.sleep(_server.config.action_delay)
@@ -98,5 +111,9 @@ def cue_key(key: str) -> str:
         pyautogui.hotkey(*keys)
 
     duration = (time.perf_counter() - start) * 1000
-    _server.audit.log("cue_key", {"key": key, "mapped": keys}, result="ok", duration_ms=duration)
+    log_params = {"key": key, "mapped": keys}
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_key", log_params, result="ok", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_key", log_params, result="ok", duration_ms=duration)
     return f"Pressed key: {key}"

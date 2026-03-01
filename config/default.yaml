@@ -79,3 +79,7 @@ policies:
           - cue_window_info
       action: allow
       reason: "Read-only tools are always allowed."
+
+# Monitoring — event streaming settings (Phase 2)
+monitoring:
+  event_buffer_size: 1000

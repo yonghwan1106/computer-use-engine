@@ -27,6 +27,10 @@ def cue_list_windows() -> list[dict]:
     """
     start = time.perf_counter()
 
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_list_windows")
+
     # M7: get blocked apps list for filtering
     blocked = _server.guardrails.config.blocked_apps if _server.guardrails else []
 
@@ -47,12 +51,10 @@ def cue_list_windows() -> list[dict]:
         })
 
     duration = (time.perf_counter() - start) * 1000
-    _server.audit.log(
-        "cue_list_windows",
-        {},
-        result=f"Found {len(windows)} windows",
-        duration_ms=duration,
-    )
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_list_windows", {}, result=f"Found {len(windows)} windows", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_list_windows", {}, result=f"Found {len(windows)} windows", duration_ms=duration)
     return windows
 
 
@@ -72,6 +74,15 @@ def cue_focus_window(title: str) -> str:
         _server.guardrails.check_app_allowed(title)
     except PermissionError as e:
         return f"Error: {e}"
+
+    params = {"title": title}
+    decision = None
+    if _server.pipeline is not None:
+        try:
+            decision = _server.pipeline.pre_action("cue_focus_window", params, target_app=title)
+        except PermissionError as e:
+            return f"Error: {e}"
+
     start = time.perf_counter()
 
     # H5: apply action delay
@@ -93,30 +104,24 @@ def cue_focus_window(title: str) -> str:
                     w.restore()
                 except Exception as e:
                     duration = (time.perf_counter() - start) * 1000
-                    _server.audit.log(
-                        "cue_focus_window",
-                        {"title": title},
-                        error=str(e),
-                        duration_ms=duration,
-                    )
+                    if _server.pipeline is not None:
+                        _server.pipeline.post_action("cue_focus_window", params, error=str(e), duration_ms=duration, decision=decision)
+                    else:
+                        _server.audit.log("cue_focus_window", params, error=str(e), duration_ms=duration)
                     return f"Error focusing window: {e}"
 
             duration = (time.perf_counter() - start) * 1000
-            _server.audit.log(
-                "cue_focus_window",
-                {"title": title},
-                result=f"Focused: {wtitle}",
-                duration_ms=duration,
-            )
+            if _server.pipeline is not None:
+                _server.pipeline.post_action("cue_focus_window", params, result=f"Focused: {wtitle}", duration_ms=duration, decision=decision)
+            else:
+                _server.audit.log("cue_focus_window", params, result=f"Focused: {wtitle}", duration_ms=duration)
             return f"Focused window: {wtitle}"
 
     duration = (time.perf_counter() - start) * 1000
-    _server.audit.log(
-        "cue_focus_window",
-        {"title": title},
-        error="not found",
-        duration_ms=duration,
-    )
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_focus_window", params, error="not found", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_focus_window", params, error="not found", duration_ms=duration)
     return f"No window found matching '{title}'."
 
 
@@ -129,10 +134,17 @@ def cue_window_info() -> dict:
     """
     start = time.perf_counter()
 
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_window_info")
+
     try:
         w = gw.getActiveWindow()
         if w is None:
-            _server.audit.log("cue_window_info", {}, error="no active window")
+            if _server.pipeline is not None:
+                _server.pipeline.post_action("cue_window_info", {}, error="no active window", decision=decision)
+            else:
+                _server.audit.log("cue_window_info", {}, error="no active window")
             return {"error": "No active window found."}
 
         result = {
@@ -143,9 +155,15 @@ def cue_window_info() -> dict:
             "height": w.height,
         }
     except Exception as e:
-        _server.audit.log("cue_window_info", {}, error=str(e))
+        if _server.pipeline is not None:
+            _server.pipeline.post_action("cue_window_info", {}, error=str(e), decision=decision)
+        else:
+            _server.audit.log("cue_window_info", {}, error=str(e))
         return {"error": str(e)}
 
     duration = (time.perf_counter() - start) * 1000
-    _server.audit.log("cue_window_info", {}, result=str(result), duration_ms=duration)
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_window_info", {}, result=str(result), duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_window_info", {}, result=str(result), duration_ms=duration)
     return result

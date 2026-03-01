@@ -41,6 +41,9 @@ class SafetyConfig:
 
         self.policies: dict[str, Any] = data.get("policies", {})
 
+        monitoring = data.get("monitoring", {})
+        self.event_buffer_size: int = monitoring.get("event_buffer_size", 1000)
+
 
 def load_config(path: Optional[Path] = None) -> SafetyConfig:
     """Load safety configuration from a YAML file.

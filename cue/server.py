@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from cue.monitor.events import EventBus
 from cue.safety.guardrails import Guardrails, SafetyConfig, load_config
 from cue.safety.logger import AuditLogger
+from cue.safety.pipeline import SafetyPipeline
 from cue.utils.screen import enable_dpi_awareness
 
 # Create FastMCP server (no side effects)
@@ -15,12 +17,14 @@ mcp = FastMCP("CUE — Computer Use Enforcer")
 config: SafetyConfig | None = None
 guardrails: Guardrails | None = None
 audit: AuditLogger | None = None
+event_bus: EventBus | None = None
+pipeline: SafetyPipeline | None = None
 _initialized = False
 
 
 def init() -> None:
     """Initialize safety components. Called once before the server starts."""
-    global config, guardrails, audit, _initialized
+    global config, guardrails, audit, event_bus, pipeline, _initialized
     if _initialized:
         return
 
@@ -43,6 +47,11 @@ def init() -> None:
     guardrails.attach_policy_engine(policy_engine)
     guardrails.attach_session_manager(session_manager)
 
+    # Phase 2: event bus and safety pipeline
+    event_bus = EventBus(buffer_size=config.event_buffer_size)
+    session_manager.event_bus = event_bus
+    pipeline = SafetyPipeline(policy_engine, session_manager, event_bus, audit)
+
     _initialized = True
 
 
@@ -51,3 +60,4 @@ import cue.tools.screenshot  # noqa: E402, F401
 import cue.tools.mouse  # noqa: E402, F401
 import cue.tools.keyboard  # noqa: E402, F401
 import cue.tools.window  # noqa: E402, F401
+import cue.tools.monitor  # noqa: E402, F401

@@ -12,6 +12,7 @@ from cue.core.models import (
     RiskLevel,
     SessionStatus,
 )
+from cue.monitor.events import EventType
 
 
 class Session:
@@ -123,6 +124,7 @@ class SessionManager:
         self.max_actions = max_actions
         self._current: Optional[Session] = None
         self._sessions: list[Session] = []
+        self.event_bus = None
 
     @property
     def current_session(self) -> Optional[Session]:
@@ -135,6 +137,12 @@ class SessionManager:
             return self._current.action_count
         return 0
 
+    def _emit(self, event_type: EventType, data: dict) -> None:
+        """Emit an event if event_bus is available."""
+        if self.event_bus is not None:
+            from cue.monitor.events import Event
+            self.event_bus.emit(Event(type=event_type, data=data))
+
     def start_session(self) -> Session:
         """Start a new session, terminating the current one if any."""
         if self._current is not None and self._current.status != SessionStatus.TERMINATED:
@@ -142,6 +150,7 @@ class SessionManager:
         session = Session(max_actions=self.max_actions)
         self._current = session
         self._sessions.append(session)
+        self._emit(EventType.SESSION_STARTED, {"session_id": session.id, "max_actions": self.max_actions})
         return session
 
     def ensure_session(self) -> Session:
@@ -176,6 +185,7 @@ class SessionManager:
         """Terminate current session and start fresh."""
         if self._current is not None:
             self._current.terminate()
+            self._emit(EventType.SESSION_TERMINATED, {"session_id": self._current.id})
         self._current = None
 
     def get_history(self) -> list[dict[str, Any]]:

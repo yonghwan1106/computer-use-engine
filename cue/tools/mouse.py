@@ -49,12 +49,19 @@ def cue_click(
     if coord_error:
         return coord_error
 
+    params = {"x": x, "y": y, "button": button, "clicks": clicks}
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_click", params)
+
     time.sleep(_server.config.action_delay)
     pyautogui.click(x=x, y=y, button=button, clicks=clicks)
 
     duration = (time.perf_counter() - start) * 1000
-    params = {"x": x, "y": y, "button": button, "clicks": clicks}
-    _server.audit.log("cue_click", params, result="ok", duration_ms=duration)
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_click", params, result="ok", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_click", params, result="ok", duration_ms=duration)
     return f"Clicked {button} button {clicks}x at ({x}, {y})."
 
 
@@ -78,14 +85,21 @@ def cue_scroll(
     if coord_error:
         return coord_error
 
+    params = {"x": x, "y": y, "clicks": clicks}
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_scroll", params)
+
     time.sleep(_server.config.action_delay)
     pyautogui.moveTo(x, y)
     pyautogui.scroll(clicks)
 
     duration = (time.perf_counter() - start) * 1000
-    params = {"x": x, "y": y, "clicks": clicks}
     direction = "up" if clicks > 0 else "down"
-    _server.audit.log("cue_scroll", params, result="ok", duration_ms=duration)
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_scroll", params, result="ok", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_scroll", params, result="ok", duration_ms=duration)
     return f"Scrolled {direction} {abs(clicks)} clicks at ({x}, {y})."
 
 
@@ -104,11 +118,19 @@ def cue_move(x: int, y: int) -> str:
     if coord_error:
         return coord_error
 
+    params = {"x": x, "y": y}
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_move", params)
+
     time.sleep(_server.config.action_delay)
     pyautogui.moveTo(x, y)
 
     duration = (time.perf_counter() - start) * 1000
-    _server.audit.log("cue_move", {"x": x, "y": y}, result="ok", duration_ms=duration)
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_move", params, result="ok", duration_ms=duration, decision=decision)
+    else:
+        _server.audit.log("cue_move", params, result="ok", duration_ms=duration)
     return f"Moved cursor to ({x}, {y})."
 
 
@@ -144,6 +166,15 @@ def cue_drag(
     if coord_error:
         return coord_error
 
+    params = {
+        "start_x": start_x, "start_y": start_y,
+        "end_x": end_x, "end_y": end_y,
+        "button": button,
+    }
+    decision = None
+    if _server.pipeline is not None:
+        decision = _server.pipeline.pre_action("cue_drag", params)
+
     time.sleep(_server.config.action_delay)
     pyautogui.moveTo(start_x, start_y)
     pyautogui.mouseDown(button=button)
@@ -153,10 +184,8 @@ def cue_drag(
         pyautogui.mouseUp(button=button)
 
     elapsed = (time.perf_counter() - start) * 1000
-    params = {
-        "start_x": start_x, "start_y": start_y,
-        "end_x": end_x, "end_y": end_y,
-        "button": button,
-    }
-    _server.audit.log("cue_drag", params, result="ok", duration_ms=elapsed)
+    if _server.pipeline is not None:
+        _server.pipeline.post_action("cue_drag", params, result="ok", duration_ms=elapsed, decision=decision)
+    else:
+        _server.audit.log("cue_drag", params, result="ok", duration_ms=elapsed)
     return f"Dragged from ({start_x}, {start_y}) to ({end_x}, {end_y})."
