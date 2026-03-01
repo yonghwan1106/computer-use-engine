@@ -26,11 +26,23 @@ def init() -> None:
 
     import pyautogui
 
+    from cue.core.policy import PolicyEngine
+    from cue.core.risk import RiskScorer
+    from cue.core.session import SessionManager
+
     enable_dpi_awareness()
     config = load_config()
     pyautogui.FAILSAFE = config.failsafe  # C1: apply failsafe setting
     guardrails = Guardrails(config)
     audit = AuditLogger(path=config.log_path, enabled=config.log_enabled)
+
+    # Phase 1: attach policy engine and session manager
+    risk_scorer = RiskScorer()
+    policy_engine = PolicyEngine.from_config(config.policies, risk_scorer)
+    session_manager = SessionManager(max_actions=config.max_actions)
+    guardrails.attach_policy_engine(policy_engine)
+    guardrails.attach_session_manager(session_manager)
+
     _initialized = True
 
 

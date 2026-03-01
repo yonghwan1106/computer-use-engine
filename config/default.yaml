@@ -41,3 +41,41 @@ logging:
   path: "cue_audit.jsonl"
   # Log level: DEBUG, INFO, WARNING, ERROR
   level: "INFO"
+
+# Policy engine — rule-based action evaluation (Phase 1)
+policies:
+  enabled: true
+  default_action: allow
+  rules:
+    - name: block_system_keys
+      conditions:
+        risk_level: CRITICAL
+        tool: cue_key
+      action: deny
+      reason: "System-level key combinations are blocked."
+
+    - name: block_admin_apps
+      conditions:
+        target_app:
+          - "Windows Security"
+          - "Registry Editor"
+          - "Task Manager"
+      action: deny
+      reason: "Administrative applications are blocked."
+
+    - name: warn_high_risk
+      conditions:
+        risk_level: HIGH
+      action: warn
+      reason: "Action classified as high risk."
+
+    - name: allow_readonly
+      conditions:
+        tool:
+          - cue_screenshot
+          - cue_screen_size
+          - cue_cursor_position
+          - cue_list_windows
+          - cue_window_info
+      action: allow
+      reason: "Read-only tools are always allowed."

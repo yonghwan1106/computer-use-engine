@@ -39,6 +39,8 @@ class SafetyConfig:
         self.log_path: str = log.get("path", "cue_audit.jsonl")
         self.log_level: str = log.get("level", "INFO")
 
+        self.policies: dict[str, Any] = data.get("policies", {})
+
 
 def load_config(path: Optional[Path] = None) -> SafetyConfig:
     """Load safety configuration from a YAML file.
@@ -60,9 +62,21 @@ class Guardrails:
     def __init__(self, config: Optional[SafetyConfig] = None) -> None:
         self.config = config or load_config()
         self._action_count = 0
+        self._policy_engine: Any = None
+        self._session_manager: Any = None
+
+    def attach_policy_engine(self, engine: Any) -> None:
+        """Attach a PolicyEngine instance for rule-based evaluation."""
+        self._policy_engine = engine
+
+    def attach_session_manager(self, manager: Any) -> None:
+        """Attach a SessionManager instance for session tracking."""
+        self._session_manager = manager
 
     @property
     def action_count(self) -> int:
+        if self._session_manager is not None:
+            return self._session_manager.action_count
         return self._action_count
 
     def check_action_limit(self) -> None:
@@ -110,3 +124,5 @@ class Guardrails:
     def reset(self) -> None:
         """Reset session action counter."""
         self._action_count = 0
+        if self._session_manager is not None:
+            self._session_manager.reset()
