@@ -1,0 +1,42 @@
+# CUE Safety Configuration
+safety:
+  # Maximum actions per session (0 = unlimited)
+  max_actions_per_session: 100
+
+  # Pause duration (seconds) between actions for safety
+  action_delay: 0.05
+
+  # pyautogui FAILSAFE — moving mouse to (0,0) aborts
+  failsafe: true
+
+  # Application allowlist (empty = allow all)
+  # Only these apps can be targeted by focus/click actions
+  allowed_apps: []
+
+  # Application blocklist — these apps are never targeted
+  blocked_apps:
+    - "Windows Security"
+    - "Registry Editor"
+    - "Task Manager"
+
+  # Blocked key combinations
+  blocked_keys:
+    - "win+r"        # Run dialog
+    - "alt+f4"       # Close window (use with caution)
+    - "ctrl+alt+del" # System interrupt
+
+screenshot:
+  # Output format
+  format: "JPEG"
+  # JPEG quality (1-100)
+  quality: 80
+  # Max dimension (longest side) — larger images are resized
+  max_dimension: 1568
+
+logging:
+  # Enable JSON Lines audit logging
+  enabled: true
+  # Log file path (relative to CWD or absolute)
+  path: "cue_audit.jsonl"
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
