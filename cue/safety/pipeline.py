@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from cue.core.models import ActionContext, PolicyAction, PolicyDecision, RiskLevel
+from cue.core.models import (
+    ActionContext,
+    ApprovalRequiredError,
+    PolicyAction,
+    PolicyDecision,
+    RiskLevel,
+)
 from cue.monitor.events import Event, EventBus, EventType
 
 
@@ -18,11 +24,13 @@ class SafetyPipeline:
         session_manager: Any,
         event_bus: EventBus,
         audit: Any,
+        approval_manager: Any = None,
     ) -> None:
         self.policy_engine = policy_engine
         self.session_manager = session_manager
         self.event_bus = event_bus
         self.audit = audit
+        self.approval_manager = approval_manager
 
     def pre_action(
         self,
@@ -35,8 +43,34 @@ class SafetyPipeline:
 
         Emits POLICY_DECISION and ACTION_STARTED events.
         Raises PermissionError if the policy denies the action.
+        Raises ApprovalRequiredError if the policy holds the action.
         Emits RISK_ALERT for WARN decisions.
         """
+        # Check for an existing grant that bypasses policy evaluation
+        if self.approval_manager is not None:
+            grant = self.approval_manager.check_grant(
+                tool=tool,
+                params=params,
+                target_app=target_app,
+                key_combo=key_combo,
+            )
+            if grant is not None:
+                # Grant consumed — allow the action through
+                self.event_bus.emit(Event(
+                    type=EventType.ACTION_STARTED,
+                    data={
+                        "tool": tool,
+                        "params": params or {},
+                        "risk_level": "LOW",
+                        "grant_used": grant.request_id,
+                    },
+                ))
+                return PolicyDecision(
+                    action=PolicyAction.ALLOW,
+                    rule_name="approval_grant",
+                    reason=f"Approved via grant {grant.request_id}",
+                )
+
         context = ActionContext(
             tool=tool,
             params=params or {},
@@ -56,6 +90,49 @@ class SafetyPipeline:
                 "risk_level": decision.risk_level.name,
             },
         ))
+
+        if decision.action == PolicyAction.HOLD:
+            if self.approval_manager is None:
+                # No approval manager — fallback to DENY
+                self.event_bus.emit(Event(
+                    type=EventType.ACTION_DENIED,
+                    data={
+                        "tool": tool,
+                        "params": params or {},
+                        "rule_name": decision.rule_name,
+                        "reason": "HOLD policy but no approval manager configured.",
+                    },
+                ))
+                raise PermissionError(
+                    f"Action denied (HOLD fallback) by policy "
+                    f"'{decision.rule_name}': {decision.reason}"
+                )
+
+            request = self.approval_manager.create_request(
+                tool=tool,
+                params=params,
+                reason=decision.reason,
+                rule_name=decision.rule_name,
+                risk_level=decision.risk_level.name,
+                target_app=target_app,
+                key_combo=key_combo,
+            )
+            self.event_bus.emit(Event(
+                type=EventType.APPROVAL_REQUIRED,
+                data={
+                    "request_id": request.id,
+                    "tool": tool,
+                    "params": params or {},
+                    "reason": decision.reason,
+                    "rule_name": decision.rule_name,
+                    "risk_level": decision.risk_level.name,
+                },
+            ))
+            raise ApprovalRequiredError(
+                request_id=request.id,
+                tool=tool,
+                reason=decision.reason,
+            )
 
         if decision.action == PolicyAction.DENY:
             self.event_bus.emit(Event(

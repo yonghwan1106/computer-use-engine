@@ -15,8 +15,8 @@ from cue.monitor.events import Event, EventBus, EventType
 # 1. EventType enum has all 10 values
 # ---------------------------------------------------------------------------
 
-def test_event_type_has_ten_values():
-    assert len(EventType) == 10
+def test_event_type_has_fourteen_values():
+    assert len(EventType) == 14
 
 
 def test_event_type_members():
@@ -32,6 +32,10 @@ def test_event_type_members():
         "SESSION_RESUMED",
         "SESSION_TERMINATED",
         "GUARDRAIL_TRIGGERED",
+        "APPROVAL_REQUIRED",
+        "APPROVAL_GRANTED",
+        "APPROVAL_DENIED",
+        "APPROVAL_EXPIRED",
     }
     assert names == expected
 

@@ -41,6 +41,10 @@ class SafetyConfig:
 
         self.policies: dict[str, Any] = data.get("policies", {})
 
+        approval = data.get("approval", {})
+        self.approval_timeout: float = float(approval.get("timeout", 300))
+        self.approval_grant_ttl: float = float(approval.get("grant_ttl", 60))
+
         monitoring = data.get("monitoring", {})
         self.event_buffer_size: int = monitoring.get("event_buffer_size", 1000)
 

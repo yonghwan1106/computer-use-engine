@@ -6,7 +6,14 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from cue.core.models import ActionContext, PolicyAction, PolicyDecision, RiskLevel
+from cue.core.approval import ApprovalManager
+from cue.core.models import (
+    ActionContext,
+    ApprovalRequiredError,
+    PolicyAction,
+    PolicyDecision,
+    RiskLevel,
+)
 from cue.monitor.events import EventBus, EventType
 from cue.safety.pipeline import SafetyPipeline
 
@@ -345,3 +352,199 @@ def test_full_flow_pre_and_post_action_event_sequence(
     assert completed_data["tool"] == "click"
     assert completed_data["result"] == "clicked"
     assert completed_data["risk_level"] == RiskLevel.LOW.name
+
+
+# ---------------------------------------------------------------------------
+# HOLD policy tests (Phase 3)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def approval_manager():
+    return ApprovalManager(timeout=300.0, grant_ttl=60.0)
+
+
+@pytest.fixture
+def hold_pipeline(mock_policy_engine, mock_session_manager, event_bus, mock_audit, approval_manager):
+    return SafetyPipeline(
+        mock_policy_engine, mock_session_manager, event_bus, mock_audit,
+        approval_manager=approval_manager,
+    )
+
+
+def test_hold_raises_approval_required_error(hold_pipeline, mock_policy_engine):
+    """HOLD decision raises ApprovalRequiredError with request_id."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_dangerous",
+        reason="Dangerous action needs approval",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    with pytest.raises(ApprovalRequiredError) as exc_info:
+        hold_pipeline.pre_action("cue_click", params={"x": 500})
+
+    err = exc_info.value
+    assert err.tool == "cue_click"
+    assert err.reason == "Dangerous action needs approval"
+    assert isinstance(err.request_id, str)
+    assert len(err.request_id) == 12
+
+
+def test_hold_is_caught_by_permission_error(hold_pipeline, mock_policy_engine):
+    """ApprovalRequiredError is a PermissionError subclass — existing catch blocks work."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_all",
+        reason="test",
+        risk_level=RiskLevel.MEDIUM,
+    )
+
+    with pytest.raises(PermissionError):
+        hold_pipeline.pre_action("cue_click")
+
+
+def test_hold_emits_approval_required_event(hold_pipeline, mock_policy_engine, event_bus):
+    """HOLD emits APPROVAL_REQUIRED event with request details."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_clicks",
+        reason="needs review",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    with pytest.raises(ApprovalRequiredError):
+        hold_pipeline.pre_action("cue_click", params={"x": 10})
+
+    events = event_bus.get_buffered(event_type=EventType.APPROVAL_REQUIRED)
+    assert len(events) == 1
+    data = events[0].data
+    assert data["tool"] == "cue_click"
+    assert data["reason"] == "needs review"
+    assert data["rule_name"] == "hold_clicks"
+    assert "request_id" in data
+
+
+def test_hold_does_not_emit_action_started(hold_pipeline, mock_policy_engine, event_bus):
+    """HOLD must NOT emit ACTION_STARTED."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_all",
+        reason="test",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    with pytest.raises(ApprovalRequiredError):
+        hold_pipeline.pre_action("cue_click")
+
+    started = event_bus.get_buffered(event_type=EventType.ACTION_STARTED)
+    assert len(started) == 0
+
+
+def test_hold_without_approval_manager_falls_back_to_deny(
+    mock_policy_engine, mock_session_manager, event_bus, mock_audit
+):
+    """HOLD with no approval_manager raises PermissionError (DENY fallback)."""
+    pipe = SafetyPipeline(mock_policy_engine, mock_session_manager, event_bus, mock_audit)
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_rule",
+        reason="test",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    with pytest.raises(PermissionError, match="HOLD fallback"):
+        pipe.pre_action("cue_click")
+
+    # Should emit ACTION_DENIED, not APPROVAL_REQUIRED
+    denied = event_bus.get_buffered(event_type=EventType.ACTION_DENIED)
+    assert len(denied) == 1
+    approval = event_bus.get_buffered(event_type=EventType.APPROVAL_REQUIRED)
+    assert len(approval) == 0
+
+
+def test_grant_bypasses_policy(hold_pipeline, mock_policy_engine, approval_manager, event_bus):
+    """After approval, the grant lets the action bypass policy evaluation."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_clicks",
+        reason="risky",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    # First call: HOLD → ApprovalRequiredError
+    with pytest.raises(ApprovalRequiredError) as exc_info:
+        hold_pipeline.pre_action("cue_click", params={"x": 500})
+
+    request_id = exc_info.value.request_id
+
+    # Approve the request
+    approval_manager.approve(request_id)
+
+    # Second call: grant consumed → ALLOW without policy evaluation
+    decision = hold_pipeline.pre_action("cue_click", params={"x": 500})
+    assert decision.action == PolicyAction.ALLOW
+    assert decision.rule_name == "approval_grant"
+
+    # ACTION_STARTED should be emitted with grant info
+    started = event_bus.get_buffered(event_type=EventType.ACTION_STARTED)
+    assert any(e.data.get("grant_used") == request_id for e in started)
+
+
+def test_grant_is_one_time_use(hold_pipeline, mock_policy_engine, approval_manager):
+    """A consumed grant cannot be reused."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_clicks",
+        reason="risky",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    # Create request and approve
+    with pytest.raises(ApprovalRequiredError) as exc_info:
+        hold_pipeline.pre_action("cue_click")
+    approval_manager.approve(exc_info.value.request_id)
+
+    # First retry: succeeds
+    hold_pipeline.pre_action("cue_click")
+
+    # Second retry: HOLD again (grant consumed)
+    with pytest.raises(ApprovalRequiredError):
+        hold_pipeline.pre_action("cue_click")
+
+
+def test_full_hold_approve_retry_flow(
+    hold_pipeline, mock_policy_engine, approval_manager, event_bus, mock_session_manager
+):
+    """End-to-end: HOLD → approve → retry → post_action."""
+    mock_policy_engine.evaluate.return_value = PolicyDecision(
+        action=PolicyAction.HOLD,
+        rule_name="hold_clicks",
+        reason="risky click",
+        risk_level=RiskLevel.HIGH,
+    )
+
+    # Step 1: HOLD
+    with pytest.raises(ApprovalRequiredError) as exc_info:
+        hold_pipeline.pre_action("cue_click", params={"x": 100, "y": 200})
+
+    # Step 2: Approve
+    approval_manager.approve(exc_info.value.request_id)
+
+    # Step 3: Retry → succeeds
+    decision = hold_pipeline.pre_action("cue_click", params={"x": 100, "y": 200})
+    assert decision.action == PolicyAction.ALLOW
+
+    # Step 4: Post action
+    hold_pipeline.post_action(
+        tool="cue_click",
+        params={"x": 100, "y": 200},
+        result="clicked",
+        decision=decision,
+    )
+
+    # Verify events: POLICY_DECISION, APPROVAL_REQUIRED, ACTION_STARTED, ACTION_COMPLETED
+    types = _types(event_bus)
+    assert EventType.POLICY_DECISION in types
+    assert EventType.APPROVAL_REQUIRED in types
+    assert EventType.ACTION_STARTED in types
+    assert EventType.ACTION_COMPLETED in types

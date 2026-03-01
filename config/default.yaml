@@ -80,6 +80,11 @@ policies:
       action: allow
       reason: "Read-only tools are always allowed."
 
+# Approval — human-in-the-loop settings (Phase 3)
+approval:
+  timeout: 300        # Max seconds to wait for approval before expiring
+  grant_ttl: 60       # Seconds a granted approval remains valid for retry
+
 # Monitoring — event streaming settings (Phase 2)
 monitoring:
   event_buffer_size: 1000

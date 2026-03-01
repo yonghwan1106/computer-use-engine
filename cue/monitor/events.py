@@ -24,6 +24,10 @@ class EventType(Enum):
     SESSION_RESUMED = "session_resumed"
     SESSION_TERMINATED = "session_terminated"
     GUARDRAIL_TRIGGERED = "guardrail_triggered"
+    APPROVAL_REQUIRED = "approval_required"
+    APPROVAL_GRANTED = "approval_granted"
+    APPROVAL_DENIED = "approval_denied"
+    APPROVAL_EXPIRED = "approval_expired"
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,24 @@ class PolicyAction(Enum):
     ALLOW = "allow"
     DENY = "deny"
     WARN = "warn"
+    HOLD = "hold"
+
+
+class ApprovalRequiredError(PermissionError):
+    """HOLD policy decision — requires human approval before proceeding.
+
+    Inherits PermissionError so existing tool catch blocks handle it naturally.
+    """
+
+    def __init__(self, request_id: str, tool: str, reason: str) -> None:
+        self.request_id = request_id
+        self.tool = tool
+        self.reason = reason
+        super().__init__(
+            f"Action requires approval [ID: {request_id}]. "
+            f"Reason: {reason}. "
+            f"Ask the user to approve, then call cue_approve_action('{request_id}')."
+        )
 
 
 @dataclass(frozen=True)

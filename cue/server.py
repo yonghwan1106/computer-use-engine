@@ -19,12 +19,13 @@ guardrails: Guardrails | None = None
 audit: AuditLogger | None = None
 event_bus: EventBus | None = None
 pipeline: SafetyPipeline | None = None
+approval_manager: object | None = None
 _initialized = False
 
 
 def init() -> None:
     """Initialize safety components. Called once before the server starts."""
-    global config, guardrails, audit, event_bus, pipeline, _initialized
+    global config, guardrails, audit, event_bus, pipeline, approval_manager, _initialized
     if _initialized:
         return
 
@@ -50,7 +51,18 @@ def init() -> None:
     # Phase 2: event bus and safety pipeline
     event_bus = EventBus(buffer_size=config.event_buffer_size)
     session_manager.event_bus = event_bus
-    pipeline = SafetyPipeline(policy_engine, session_manager, event_bus, audit)
+
+    # Phase 3: approval manager for HOLD decisions
+    from cue.core.approval import ApprovalManager
+
+    approval_manager = ApprovalManager(
+        timeout=config.approval_timeout,
+        grant_ttl=config.approval_grant_ttl,
+    )
+    pipeline = SafetyPipeline(
+        policy_engine, session_manager, event_bus, audit,
+        approval_manager=approval_manager,
+    )
 
     _initialized = True
 
@@ -61,3 +73,4 @@ import cue.tools.mouse  # noqa: E402, F401
 import cue.tools.keyboard  # noqa: E402, F401
 import cue.tools.window  # noqa: E402, F401
 import cue.tools.monitor  # noqa: E402, F401
+import cue.tools.approval  # noqa: E402, F401
