@@ -1,3 +1,3 @@
-"""CUE — Computer Use Engine: MCP server for AI-driven desktop automation."""
+"""CUE — Computer Use Enforcer: safety middleware for AI computer use agents."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

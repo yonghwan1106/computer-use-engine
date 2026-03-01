@@ -1,4 +1,4 @@
-"""CUE MCP Server — FastMCP instance with safety initialization."""
+"""CUE — Computer Use Enforcer: MCP server with safety enforcement."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from cue.safety.logger import AuditLogger
 from cue.utils.screen import enable_dpi_awareness
 
 # Create FastMCP server (no side effects)
-mcp = FastMCP("CUE — Computer Use Engine")
+mcp = FastMCP("CUE — Computer Use Enforcer")
 
 # Lazy-init holders (populated by init())
 config: SafetyConfig | None = None

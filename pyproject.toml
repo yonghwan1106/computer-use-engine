@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "computer-use-engine"
-version = "0.1.0"
-description = "AI Computer Use agent framework — MCP server for desktop automation"
+version = "0.2.0"
+description = "Safety middleware for AI computer use agents — monitoring, guardrails, and compliance"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [{ name = "yonghwan1106" }]
-keywords = ["mcp", "computer-use", "automation", "ai-agent"]
+keywords = ["mcp", "computer-use", "ai-safety", "guardrails", "agent-safety", "compliance"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

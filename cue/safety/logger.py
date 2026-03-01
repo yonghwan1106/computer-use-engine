@@ -1,4 +1,4 @@
-"""JSON Lines audit logger for CUE actions."""
+"""CUE audit logger — JSON Lines compliance trail for all agent actions."""
 
 from __future__ import annotations
 

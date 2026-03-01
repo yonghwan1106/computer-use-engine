@@ -1,1 +1,1 @@
-"""CUE safety modules."""
+"""CUE safety modules — guardrails, audit logging, and policy enforcement."""

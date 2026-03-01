@@ -1,4 +1,4 @@
-"""Auto-register CUE MCP server in Claude Desktop and Claude Code settings."""
+"""Auto-register CUE (Computer Use Enforcer) MCP server in Claude Desktop and Claude Code settings."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def register_claude_code() -> bool:
 
 
 def main():
-    print("CUE MCP Server Registration")
+    print("CUE — Computer Use Enforcer | MCP Server Registration")
     print("=" * 40)
     print()
 

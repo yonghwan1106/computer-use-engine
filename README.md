@@ -1,4 +1,4 @@
-# CUE — Computer Use Engine
+# CUE — Computer Use Enforcer
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green.svg)](https://www.python.org/)
@@ -6,31 +6,57 @@
 
 **English** | [한국어](README.ko.md)
 
-CUE is an AI Computer Use agent framework that runs as an **MCP (Model Context Protocol) server**. It gives Claude the ability to see your screen, move the mouse, type on the keyboard, and manage windows — all through natural language.
+> **The missing safety layer between AI agents and your desktop.**
 
-## Why CUE?
+CUE is safety middleware for AI computer use agents. It monitors, enforces policies, and provides guardrails so that AI agents can interact with your desktop — safely and compliantly.
 
-Traditional AI Computer Use requires direct API calls with per-token billing. CUE **inverts the architecture**: instead of your code calling the AI, the AI calls CUE through MCP. This means:
+---
 
-- **No extra API costs** — works with your existing Claude Max subscription
-- **Natural language control** — just tell Claude what to do on your desktop
-- **Safe by default** — action limits, app blocklists, key blocking, and audit logging
+## Problem
+
+AI computer use is accelerating fast, but safety infrastructure hasn't kept up:
+
+- **Rapid adoption** — 40% of enterprises plan to deploy AI computer use agents by end of 2026
+- **No guardrails** — only 50% of organizations have any safety controls for autonomous agents
+- **Regulation is coming** — the EU AI Act (Aug 2026) mandates human oversight for high-risk AI systems
+
+There is no open-source framework that sits between AI agents and the desktop to enforce safety policies. CUE fills that gap.
+
+## What CUE Does
 
 ```
-┌─────────────────────────────┐
-│  Claude Desktop / Code      │  ← AI brain (your Max subscription)
-│  (natural language in/out)  │
-└──────────┬──────────────────┘
+┌─────────────────────────────────┐
+│  Any AI Agent                   │  Claude, GPT, Agent-S, ...
+│  (natural language in/out)      │
+└──────────┬──────────────────────┘
            │ MCP protocol (stdio)
-┌──────────▼──────────────────┐
-│  CUE MCP Server (Python)    │  ← this project
-│  12 tools for desktop ctrl  │
-└──────────┬──────────────────┘
+┌──────────▼──────────────────────┐
+│  CUE — Computer Use Enforcer   │  ← this project
+│  ┌────────────────────────────┐ │
+│  │ Policy Engine              │ │  risk classification, action filtering
+│  │ Guardrails                 │ │  app blocklist, key blocking, rate limits
+│  │ Audit Logger               │ │  JSONL compliance trail
+│  │ Monitor (coming soon)      │ │  real-time dashboard & event streaming
+│  └────────────────────────────┘ │
+└──────────┬──────────────────────┘
            │ pyautogui / pygetwindow / pywin32
-┌──────────▼──────────────────┐
-│  Windows Desktop            │
-└─────────────────────────────┘
+┌──────────▼──────────────────────┐
+│  Desktop OS                     │
+└─────────────────────────────────┘
 ```
+
+### Core Value Proposition
+
+| Capability | Status | Description |
+|------------|--------|-------------|
+| **Action Guardrails** | Available | App blocklist, key blocking, per-session action limits |
+| **Audit Logging** | Available | Every action logged to JSONL for compliance review |
+| **FAILSAFE** | Available | Mouse to (0,0) aborts immediately |
+| **Policy Engine** | Phase 1 | Risk classification, rule-based action filtering |
+| **Real-time Monitor** | Phase 2 | Live dashboard with event streaming |
+| **Human-in-the-Loop** | Phase 3 | Approval workflows for high-risk actions |
+| **Agent Adapters** | Phase 4 | Agent-agnostic backends (Claude, GPT, open-source) |
+| **Compliance Reports** | Phase 5 | Automated audit reports for EU AI Act, SOC 2 |
 
 ## Quick Start
 
@@ -60,9 +86,11 @@ Restart Claude Desktop or Claude Code. Then just ask:
 
 > "Show me all open windows"
 
-## MCP Tools (12)
+## Current Features
 
-### Screenshot & Screen
+### MCP Tools (12)
+
+#### Screenshot & Screen
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -70,7 +98,7 @@ Restart Claude Desktop or Claude Code. Then just ask:
 | `cue_screen_size` | Get screen resolution | — |
 | `cue_cursor_position` | Get current cursor coordinates | — |
 
-### Mouse
+#### Mouse
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -79,20 +107,51 @@ Restart Claude Desktop or Claude Code. Then just ask:
 | `cue_move` | Move cursor | `x`, `y` |
 | `cue_drag` | Drag from point A to B | `start_x`, `start_y`, `end_x`, `end_y`, `button`, `duration` |
 
-### Keyboard
+#### Keyboard
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `cue_type` | Type text (auto clipboard fallback for non-ASCII like Korean/CJK) | `text` |
 | `cue_key` | Press key or combo | `key` (e.g. `"enter"`, `"ctrl+c"`, `"alt+tab"`) |
 
-### Window Management
+#### Window Management
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `cue_list_windows` | List all visible windows with geometry | — |
 | `cue_focus_window` | Focus a window by partial title match | `title` |
 | `cue_window_info` | Get active window info | — |
+
+### Safety Features
+
+| Feature | Description | Default |
+|---------|-------------|---------|
+| **Action limit** | Max actions per session before requiring reset | 100 |
+| **App blocklist** | Prevents interaction with sensitive apps | Registry Editor, Windows Security |
+| **Key blocklist** | Blocks dangerous key combos | `win+r`, `ctrl+alt+del` |
+| **Audit log** | Every action logged to JSONL file | `cue_audit.jsonl` |
+| **FAILSAFE** | Move mouse to (0, 0) to abort immediately | Enabled |
+| **Action delay** | Pause between actions for safety | 50ms |
+
+## Safety Policy
+
+All safety settings are configurable in `config/default.yaml`:
+
+```yaml
+safety:
+  max_actions_per_session: 100
+  action_delay: 0.05
+  failsafe: true
+  allowed_apps: []
+  blocked_apps:
+    - "Windows Security"
+    - "Registry Editor"
+    - "Task Manager"
+  blocked_keys:
+    - "win+r"
+    - "alt+f4"
+    - "ctrl+alt+del"
+```
 
 ## Manual Registration
 
@@ -122,21 +181,6 @@ If you prefer to configure manually instead of using `register.py`:
 }
 ```
 
-## Safety
-
-CUE is designed with safety as a first-class concern:
-
-| Feature | Description | Default |
-|---------|-------------|---------|
-| **Action limit** | Max actions per session before requiring reset | 100 |
-| **App blocklist** | Prevents interaction with sensitive apps | Registry Editor, Windows Security |
-| **Key blocklist** | Blocks dangerous key combos | `win+r`, `ctrl+alt+del` |
-| **Audit log** | Every action logged to JSONL file | `cue_audit.jsonl` |
-| **FAILSAFE** | Move mouse to (0, 0) to abort immediately | Enabled |
-| **Action delay** | Pause between actions for safety | 50ms |
-
-All safety settings are configurable in `config/default.yaml`.
-
 ## Project Structure
 
 ```
@@ -153,6 +197,9 @@ computer-use-engine/
 │   ├── safety/
 │   │   ├── guardrails.py      # Action limits, app/key blocking
 │   │   └── logger.py          # JSONL audit logger
+│   ├── core/                  # Policy engine, risk scoring (Phase 1)
+│   ├── monitor/               # Real-time dashboard (Phase 2)
+│   ├── adapters/              # Agent-agnostic backends (Phase 4)
 │   └── utils/
 │       ├── screen.py          # DPI awareness, image processing
 │       └── keymap.py          # xdotool → pyautogui key mapping
@@ -160,7 +207,7 @@ computer-use-engine/
 │   └── default.yaml           # Safety configuration
 ├── scripts/
 │   └── register.py            # Auto-registration for Claude
-├── tests/                     # Unit tests (41 tests)
+├── tests/                     # Unit tests
 ├── pyproject.toml
 ├── LICENSE                    # Apache 2.0
 └── README.md
@@ -179,12 +226,16 @@ pytest tests/ -v
 python -m cue
 ```
 
-## Key Design Decisions
+## Roadmap
 
-- **Individual tools over unified action** — MCP works better when Claude can see separate tool schemas rather than a single tool with an `action` parameter
-- **JPEG screenshots at quality 80** — 63% smaller than PNG, optimized for Claude's vision (max 1568px longest side)
-- **Clipboard fallback for non-ASCII** — `pyautogui.write()` only supports ASCII; CUE auto-detects non-ASCII text and uses `pyperclip.copy()` + `ctrl+v`
-- **DPI awareness** — `SetProcessDpiAwareness(2)` called at startup to prevent coordinate mismatch on scaled displays
+| Phase | Focus | Status |
+|-------|-------|--------|
+| **MVP** | MCP server, 12 tools, basic guardrails | Done |
+| **Phase 1** | Policy engine, risk classification, session management | Next |
+| **Phase 2** | Real-time monitoring dashboard, event streaming | Planned |
+| **Phase 3** | Human-in-the-loop approval workflows | Planned |
+| **Phase 4** | Agent-agnostic adapters (Claude, GPT, Agent-S) | Planned |
+| **Phase 5** | Compliance reports (EU AI Act, SOC 2) | Planned |
 
 ## Requirements
 
@@ -192,23 +243,9 @@ python -m cue
 - Windows 10/11
 - Claude Desktop or Claude Code with MCP support
 
-### Dependencies
+## Contributing
 
-| Package | Purpose |
-|---------|---------|
-| `mcp` | FastMCP server framework |
-| `pyautogui` | Mouse, keyboard, screenshot |
-| `Pillow` | Image processing and JPEG conversion |
-| `pywin32` | Windows API access |
-| `pygetwindow` | Window enumeration and management |
-| `pyperclip` | Clipboard access (non-ASCII input) |
-| `pyyaml` | Safety config parsing |
-
-## Roadmap
-
-- [ ] **Phase 2**: YAML workflow engine, CLI (`typer`), recipe system, screenshot diff detection
-- [ ] **Phase 3**: Live monitoring, OCR text search (`cue_find_text`), session recording/replay
-- [ ] **Phase 4**: Next.js dashboard, community recipe hub, multi-monitor support
+Contributions are welcome! Please see [LICENSE](LICENSE) for details.
 
 ## License
 

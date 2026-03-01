@@ -8,3 +8,8 @@ build/
 *.jsonl
 .venv/
 venv/
+
+# CUE runtime
+cue_audit.jsonl
+*.bak
+.omc/

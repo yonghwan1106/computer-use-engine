@@ -1,4 +1,5 @@
-# CUE Safety Configuration
+# CUE — Computer Use Enforcer: Safety Configuration
+# Policies controlling how AI agents interact with the desktop.
 safety:
   # Maximum actions per session (0 = unlimited)
   max_actions_per_session: 100
