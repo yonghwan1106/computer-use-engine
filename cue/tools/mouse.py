@@ -11,6 +11,17 @@ import cue.server as _server
 from cue.server import mcp
 
 
+def _validate_coords(x: int, y: int) -> str | None:
+    """Return error string if coordinates are outside screen bounds."""
+    screen = pyautogui.size()
+    if x < 0 or y < 0 or x >= screen.width or y >= screen.height:
+        return (
+            f"Error: coordinates ({x}, {y}) are outside screen bounds "
+            f"({screen.width}x{screen.height})."
+        )
+    return None
+
+
 @mcp.tool()
 def cue_click(
     x: int,
@@ -33,6 +44,10 @@ def cue_click(
         return f"Error: invalid button '{button}'. Use 'left', 'right', or 'middle'."
     if clicks < 1 or clicks > 3:
         return "Error: clicks must be 1, 2, or 3."
+
+    coord_error = _validate_coords(x, y)
+    if coord_error:
+        return coord_error
 
     time.sleep(_server.config.action_delay)
     pyautogui.click(x=x, y=y, button=button, clicks=clicks)
@@ -59,6 +74,10 @@ def cue_scroll(
     _server.guardrails.increment_action()
     start = time.perf_counter()
 
+    coord_error = _validate_coords(x, y)
+    if coord_error:
+        return coord_error
+
     time.sleep(_server.config.action_delay)
     pyautogui.moveTo(x, y)
     pyautogui.scroll(clicks)
@@ -80,6 +99,10 @@ def cue_move(x: int, y: int) -> str:
     """
     _server.guardrails.increment_action()
     start = time.perf_counter()
+
+    coord_error = _validate_coords(x, y)
+    if coord_error:
+        return coord_error
 
     time.sleep(_server.config.action_delay)
     pyautogui.moveTo(x, y)
@@ -114,11 +137,20 @@ def cue_drag(
     if button not in ("left", "right", "middle"):
         return f"Error: invalid button '{button}'. Use 'left', 'right', or 'middle'."
 
+    coord_error = _validate_coords(start_x, start_y)
+    if coord_error:
+        return coord_error
+    coord_error = _validate_coords(end_x, end_y)
+    if coord_error:
+        return coord_error
+
     time.sleep(_server.config.action_delay)
     pyautogui.moveTo(start_x, start_y)
     pyautogui.mouseDown(button=button)
-    pyautogui.moveTo(end_x, end_y, duration=duration or 0.5)
-    pyautogui.mouseUp(button=button)
+    try:
+        pyautogui.moveTo(end_x, end_y, duration=duration or 0.5)
+    finally:
+        pyautogui.mouseUp(button=button)
 
     elapsed = (time.perf_counter() - start) * 1000
     params = {

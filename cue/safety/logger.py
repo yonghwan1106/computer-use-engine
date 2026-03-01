@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import time
 from pathlib import Path
@@ -15,6 +16,7 @@ class AuditLogger:
         self.enabled = enabled
         self.path = Path(path)
         self._file = None
+        atexit.register(self.close)
 
     def _ensure_open(self):
         if self._file is None and self.enabled:
@@ -46,7 +48,8 @@ class AuditLogger:
             record["duration_ms"] = round(duration_ms, 2)
 
         self._ensure_open()
-        assert self._file is not None
+        if self._file is None:
+            return
         self._file.write(json.dumps(record, ensure_ascii=False) + "\n")
         self._file.flush()
 

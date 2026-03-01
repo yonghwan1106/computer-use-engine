@@ -41,9 +41,24 @@ def cue_type(text: str) -> str:
         method = "direct"
     else:
         # Non-ASCII fallback: copy to clipboard and paste
-        pyperclip.copy(text)
-        pyautogui.hotkey("ctrl", "v")
         method = "clipboard"
+        # C2: save original clipboard content
+        original_clipboard = None
+        try:
+            original_clipboard = pyperclip.paste()
+        except Exception:
+            pass
+        try:
+            pyperclip.copy(text)
+            time.sleep(0.05)  # M6: allow clipboard to settle before paste
+            pyautogui.hotkey("ctrl", "v")
+        finally:
+            # C2: restore original clipboard content
+            if original_clipboard is not None:
+                try:
+                    pyperclip.copy(original_clipboard)
+                except Exception:
+                    pass
 
     duration = (time.perf_counter() - start) * 1000
     display = text if len(text) <= 50 else text[:50] + "..."
@@ -67,7 +82,11 @@ def cue_key(key: str) -> str:
         key: Key name or combination (e.g. "enter", "ctrl+c", "alt+tab").
     """
     _server.guardrails.increment_action()
-    _server.guardrails.check_key_allowed(key)
+    # H4: catch guardrail PermissionError and return clean error string
+    try:
+        _server.guardrails.check_key_allowed(key)
+    except PermissionError as e:
+        return f"Error: {e}"
     start = time.perf_counter()
 
     time.sleep(_server.config.action_delay)

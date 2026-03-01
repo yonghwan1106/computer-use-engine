@@ -24,6 +24,49 @@ def _patch_server():
         yield {"guardrails": mock_guard, "config": mock_config, "audit": mock_audit}
 
 
+class TestCoordValidation:
+    """H2: coordinate validation tests."""
+
+    def test_valid_coords(self, mock_pyautogui):
+        from cue.tools.mouse import _validate_coords
+        assert _validate_coords(100, 200) is None
+
+    def test_negative_x(self, mock_pyautogui):
+        from cue.tools.mouse import _validate_coords
+        result = _validate_coords(-1, 200)
+        assert result is not None
+        assert "Error" in result
+
+    def test_negative_y(self, mock_pyautogui):
+        from cue.tools.mouse import _validate_coords
+        result = _validate_coords(100, -1)
+        assert result is not None
+        assert "Error" in result
+
+    def test_beyond_screen_width(self, mock_pyautogui):
+        from cue.tools.mouse import _validate_coords
+        result = _validate_coords(1920, 500)
+        assert result is not None
+        assert "Error" in result
+
+    def test_beyond_screen_height(self, mock_pyautogui):
+        from cue.tools.mouse import _validate_coords
+        result = _validate_coords(500, 1080)
+        assert result is not None
+        assert "Error" in result
+
+    def test_boundary_valid(self, mock_pyautogui):
+        from cue.tools.mouse import _validate_coords
+        # (1919, 1079) should be valid for 1920x1080 screen
+        assert _validate_coords(1919, 1079) is None
+
+    def test_click_rejects_negative(self, mock_pyautogui):
+        from cue.tools.mouse import cue_click
+        result = cue_click(-10, 200)
+        assert "Error" in result
+        mock_pyautogui["click"].assert_not_called()
+
+
 class TestCueClick:
     def test_left_click(self, mock_pyautogui):
         from cue.tools.mouse import cue_click
@@ -86,3 +129,12 @@ class TestCueDrag:
         from cue.tools.mouse import cue_drag
         result = cue_drag(0, 0, 100, 100, button="bad")
         assert "Error" in result
+
+    def test_drag_mouseup_on_failure(self, mock_pyautogui):
+        """M5: mouseUp must be called even if moveTo fails."""
+        mock_pyautogui["moveTo"].side_effect = [None, Exception("move failed")]
+        from cue.tools.mouse import cue_drag
+        with pytest.raises(Exception, match="move failed"):
+            cue_drag(100, 100, 500, 500)
+        # mouseUp must still have been called
+        mock_pyautogui["mouseUp"].assert_called_once()

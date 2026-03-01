@@ -98,9 +98,11 @@ class Guardrails:
     def check_key_allowed(self, combo: str) -> None:
         """Raise if the key combination is blocked."""
         normalized = combo.lower().replace(" ", "")
+        normalized_parts = sorted(normalized.split("+"))
         for blocked in self.config.blocked_keys:
             blocked_normalized = blocked.replace(" ", "")
-            if normalized == blocked_normalized:
+            blocked_parts = sorted(blocked_normalized.split("+"))
+            if normalized_parts == blocked_parts:
                 raise PermissionError(
                     f"Key combination '{combo}' is blocked by safety config."
                 )

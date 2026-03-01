@@ -34,8 +34,19 @@ def cue_screenshot(
     _server.guardrails.increment_action()
     start = time.perf_counter()
 
+    # H5: apply action delay
+    time.sleep(_server.config.action_delay)
+
+    # H3: error if only some region parameters are provided
+    region_params = [region_x, region_y, region_width, region_height]
+    region_names = ["region_x", "region_y", "region_width", "region_height"]
+    provided = [v is not None for v in region_params]
+    if any(provided) and not all(provided):
+        missing = [n for n, p in zip(region_names, provided) if not p]
+        raise ValueError(f"Partial region specified. Missing: {', '.join(missing)}. Provide all four or none.")
+
     region = None
-    if all(v is not None for v in (region_x, region_y, region_width, region_height)):
+    if all(provided):
         region = (region_x, region_y, region_width, region_height)
 
     img = capture_screenshot(region=region)

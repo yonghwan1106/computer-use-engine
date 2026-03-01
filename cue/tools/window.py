@@ -27,10 +27,16 @@ def cue_list_windows() -> list[dict]:
     """
     start = time.perf_counter()
 
+    # M7: get blocked apps list for filtering
+    blocked = _server.guardrails.config.blocked_apps if _server.guardrails else []
+
     windows = []
     for w in gw.getAllWindows():
         title = _safe_title(w)
         if not title or title.strip() == "":
+            continue
+        # M7: filter out windows belonging to blocked apps
+        if any(b in title.lower() for b in blocked):
             continue
         windows.append({
             "title": title,
@@ -61,8 +67,15 @@ def cue_focus_window(title: str) -> str:
         title: Partial window title to match (case-insensitive).
     """
     _server.guardrails.increment_action()
-    _server.guardrails.check_app_allowed(title)
+    # H4: catch guardrail PermissionError and return clean error string
+    try:
+        _server.guardrails.check_app_allowed(title)
+    except PermissionError as e:
+        return f"Error: {e}"
     start = time.perf_counter()
+
+    # H5: apply action delay
+    time.sleep(_server.config.action_delay)
 
     title_lower = title.lower()
     for w in gw.getAllWindows():

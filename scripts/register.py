@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -37,6 +38,12 @@ def register_claude_desktop() -> bool:
     data.setdefault("mcpServers", {})
     data["mcpServers"]["cue"] = _cue_server_config()
 
+    # H6: backup existing config before overwriting
+    if config_path.exists():
+        backup_path = config_path.with_suffix(".json.bak")
+        shutil.copy2(config_path, backup_path)
+        print(f"  Backup created: {backup_path}")
+
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
@@ -57,6 +64,12 @@ def register_claude_code() -> bool:
 
     data.setdefault("mcpServers", {})
     data["mcpServers"]["cue"] = _cue_server_config()
+
+    # H6: backup existing config before overwriting
+    if config_path.exists():
+        backup_path = config_path.with_suffix(".json.bak")
+        shutil.copy2(config_path, backup_path)
+        print(f"  Backup created: {backup_path}")
 
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

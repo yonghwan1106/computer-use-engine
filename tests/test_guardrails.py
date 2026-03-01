@@ -76,3 +76,18 @@ class TestKeyBlocking:
     def test_ctrl_alt_del_blocked(self, guardrails):
         with pytest.raises(PermissionError):
             guardrails.check_key_allowed("ctrl+alt+del")
+
+    def test_key_order_independent(self, guardrails):
+        """M8: blocking works regardless of key order."""
+        with pytest.raises(PermissionError):
+            guardrails.check_key_allowed("alt+ctrl+del")
+
+    def test_key_order_fully_reversed(self, guardrails):
+        """M8: blocking works with fully reversed key order."""
+        with pytest.raises(PermissionError):
+            guardrails.check_key_allowed("del+ctrl+alt")
+
+    def test_win_r_reversed(self, guardrails):
+        """M8: win+r blocked even when written as r+win."""
+        with pytest.raises(PermissionError):
+            guardrails.check_key_allowed("r+win")
